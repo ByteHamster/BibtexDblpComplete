@@ -1,3 +1,5 @@
+package com.bytehamster.dblpcomplete;
+
 import org.jbibtex.BibTeXDatabase;
 import org.jbibtex.BibTeXEntry;
 import org.jbibtex.BibTeXFormatter;
@@ -16,26 +18,24 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Scanner;
 
-public class Main {
-    private static final ArrayList<String> updated = new ArrayList<>();
-    private static final ArrayList<String> alreadyGood = new ArrayList<>();
-    private static final ArrayList<String> skippedManually = new ArrayList<>();
-    private static final ArrayList<String> notFound = new ArrayList<>();
+public class DblpComplete {
+    private final ArrayList<String> updated = new ArrayList<>();
+    private final ArrayList<String> alreadyGood = new ArrayList<>();
+    private final ArrayList<String> skippedManually = new ArrayList<>();
+    private final ArrayList<String> notFound = new ArrayList<>();
+    private final Format format;
+    private final BibTeXDatabase newDatabase = new BibTeXDatabase();
+    private BibTeXDatabase database;
 
-    public static void main(String[] args) {
-        if (args.length == 0) {
-            System.err.println("No argument given");
-            return;
-        }
-        String filename = args[0];
-        BibTeXDatabase database;
+    public DblpComplete(Format format) {
+        this.format = format;
+    }
+
+    public void read(String filename) {
         try {
             BibTeXParser parser = new BibTeXParser();
             FileReader reader = new FileReader(filename);
@@ -43,14 +43,15 @@ public class Main {
         } catch (ParseException | FileNotFoundException e) {
             throw new RuntimeException(e);
         }
+    }
 
-        BibTeXDatabase newDatabase = new BibTeXDatabase();
+    public void complete() {
         List<BibTeXObject> objects = database.getObjects();
         int i = 0;
         for (; i < objects.size(); i++) {
             BibTeXObject object = objects.get(i);
             if (!(object instanceof BibTeXEntry)) {
-                newDatabase.addObject(object); // Preserve comments etc
+                newDatabase.addObject(object);
                 continue;
             }
             System.out.println("\n\n");
@@ -58,7 +59,7 @@ public class Main {
             BibTeXEntry entry = (BibTeXEntry) object;
             String title = get(entry, BibTeXEntry.KEY_TITLE);
             try {
-                System.out.println("Loading from dblp [condensed]: " + title);
+                System.out.println("Loading from dblp: " + title);
                 BibTeXEntry betterEntry = tryImprove(entry);
                 if (format(entry).equals(format(betterEntry))) {
                     System.out.println("Is already optimized.");
@@ -67,16 +68,15 @@ public class Main {
                     continue;
                 }
                 preview(entry, betterEntry);
-                checkDifference(entry, betterEntry, BibTeXEntry.KEY_YEAR);
-                checkDifference(entry, betterEntry, BibTeXEntry.KEY_PAGES);
-                System.out.print("Apply this change? [Ynw] ");
-                String read = read();
+                warnIfDifferent(entry, betterEntry, BibTeXEntry.KEY_YEAR);
+                warnIfDifferent(entry, betterEntry, BibTeXEntry.KEY_PAGES);
+                System.out.print("Apply this change? [Y]es, [n]o, [w]rite&close ");
+                String read = Utils.read();
                 if (read.equals("y") || read.equals("")) {
                     newDatabase.addObject(betterEntry);
                     updated.add(title);
                 } else if (read.equals("w")) {
                     newDatabase.addObject(entry);
-                    System.out.println("Writing changes early.");
                     skippedManually.add(title);
                     break;
                 } else {
@@ -93,7 +93,9 @@ public class Main {
         for (; i < objects.size(); i++) {
             newDatabase.addObject(objects.get(i));
         }
+    }
 
+    public void write(String filename) {
         try {
             StringWriter writer = new StringWriter();
             BibTeXFormatter formatter = new BibTeXFormatter();
@@ -107,7 +109,9 @@ public class Main {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
 
+    public void printStats() {
         System.out.println("\n\n");
         System.out.println("Updated: ");
         for (String s : updated) {
@@ -127,7 +131,7 @@ public class Main {
         }
     }
 
-    private static String get(BibTeXEntry entry, Key key) {
+    private String get(BibTeXEntry entry, Key key) {
         Value title = entry.getField(key);
         if (title == null) {
             return null;
@@ -135,9 +139,9 @@ public class Main {
         return title.toUserString();
     }
 
-    private static BibTeXEntry tryImprove(BibTeXEntry entry) throws JSONException, IOException, ParseException {
-        String apiResult = httpRequest("https://dblp.org/search/publ/api?format=json&q="
-                        + URLEncoder.encode(get(entry, BibTeXEntry.KEY_TITLE), "UTF-8"));
+    private BibTeXEntry tryImprove(BibTeXEntry entry) throws JSONException, IOException, ParseException {
+        String apiResult = Utils.httpRequest("https://dblp.org/search/publ/api?format=json&q="
+                + URLEncoder.encode(get(entry, BibTeXEntry.KEY_TITLE), "UTF-8"));
         JSONObject result = new JSONObject(apiResult)
                 .getJSONObject("result")
                 .getJSONObject("hits")
@@ -145,37 +149,50 @@ public class Main {
                 .getJSONObject(0)
                 .getJSONObject("info");
         String key = result.getString("key");
-        String condensed = httpRequest("https://dblp.org/rec/" + key + ".bib?param=0"); // 0=condensed, 1=standard, 2=crossref
+        int param;
+        switch (format) {
+            case CROSSREF:
+                param = 2;
+            break;
+            case STANDARD:
+                param = 1;
+            break;
+            case CONDENSED: // Fall-through
+            case CONDENSED_WITH_DOI:
+                param = 0;
+                break;
+            default:
+                throw new RuntimeException("Unknown format");
+        }
+        String condensed = Utils.httpRequest("https://dblp.org/rec/" + key + ".bib?param=" + param);
         BibTeXEntry condensedEntry = parseSingle(condensed);
         BibTeXEntry newEntry = new BibTeXEntry(condensedEntry.getType(), entry.getKey());
         newEntry.addAllFields(condensedEntry.getFields());
-        if (result.has("doi")) {
-            String doi = result.getString("doi");
-            newEntry.addField(BibTeXEntry.KEY_DOI, new StringValue(doi, StringValue.Style.BRACED));
-        } else {
-            System.out.println("Warning: No doi found");
+        if (format == Format.CONDENSED_WITH_DOI) {
+            if (result.has("doi")) {
+                String doi = result.getString("doi");
+                newEntry.addField(BibTeXEntry.KEY_DOI, new StringValue(doi, StringValue.Style.BRACED));
+            } else {
+                System.out.println("Warning: No doi found");
+            }
         }
         return newEntry;
     }
 
-    private static void checkDifference(BibTeXEntry entry, BibTeXEntry newEntry, Key key) {
+    private void warnIfDifferent(BibTeXEntry entry, BibTeXEntry newEntry, Key key) {
         if (get(entry, key) != null && !get(entry, key).equalsIgnoreCase(get(newEntry, key))) {
             System.err.println("\u001B[31m" + "Warning: Different " + key.getValue() + "\u001B[0m");
         }
     }
 
-    private static BibTeXEntry parseSingle(String entry) throws ParseException {
+    private BibTeXEntry parseSingle(String entry) throws ParseException {
         BibTeXParser parser = new BibTeXParser();
         StringReader reader = new StringReader(entry);
         BibTeXDatabase database = parser.parse(reader);
         return database.getEntries().entrySet().iterator().next().getValue();
     }
 
-    private static String httpRequest(String url) throws IOException {
-        return new Scanner(new URL(url).openStream()).useDelimiter("\\A").next();
-    }
-
-    private static void preview(BibTeXEntry entry1, BibTeXEntry entry2) throws IOException {
+    private void preview(BibTeXEntry entry1, BibTeXEntry entry2) throws IOException {
         Columns columns = new Columns(2);
         columns.columnSeparator = " | ";
         columns.maxColumnSize = 60;
@@ -186,17 +203,12 @@ public class Main {
         System.out.println(columns);
     }
 
-    private static String format(BibTeXEntry entry) throws IOException {
+    private String format(BibTeXEntry entry) throws IOException {
         BibTeXDatabase databaseTemp = new BibTeXDatabase();
         databaseTemp.addObject(entry);
         BibTeXFormatter formatter = new BibTeXFormatter();
         StringWriter writer = new StringWriter();
         formatter.format(databaseTemp, writer);
         return writer.toString().replace("\t", "    ");
-    }
-
-    private static String read() {
-        Scanner scanner = new Scanner(System.in);
-        return scanner.nextLine().toLowerCase(Locale.ROOT);
     }
 }
