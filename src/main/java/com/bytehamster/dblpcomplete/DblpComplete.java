@@ -9,6 +9,7 @@ import org.jbibtex.Key;
 import org.jbibtex.ParseException;
 import org.jbibtex.StringValue;
 import org.jbibtex.Value;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -142,12 +143,23 @@ public class DblpComplete {
     private BibTeXEntry tryImprove(BibTeXEntry entry) throws JSONException, IOException, ParseException {
         String apiResult = Utils.httpRequest("https://dblp.org/search/publ/api?format=json&q="
                 + URLEncoder.encode(get(entry, BibTeXEntry.KEY_TITLE), "UTF-8"));
-        JSONObject result = new JSONObject(apiResult)
+        JSONObject hitParent = new JSONObject(apiResult)
                 .getJSONObject("result")
-                .getJSONObject("hits")
-                .getJSONArray("hit")
-                .getJSONObject(0)
-                .getJSONObject("info");
+                .getJSONObject("hits");
+        if (!hitParent.has("hit")) {
+            System.err.println("No hits");
+            return entry;
+        }
+        JSONArray hits = hitParent.getJSONArray("hit");
+        JSONObject result = hits.getJSONObject(0).getJSONObject("info"); // Default
+        for (int i = 0; i < hits.length(); i++) {
+            // If there is multiple search results, use the first that has the same year
+            if (get(entry, BibTeXEntry.KEY_YEAR).equals(
+                    hits.getJSONObject(i).getJSONObject("info").getString("year"))) {
+                result = hits.getJSONObject(i).getJSONObject("info");
+                break;
+            }
+        }
         String key = result.getString("key");
         int param;
         switch (format) {
@@ -173,7 +185,7 @@ public class DblpComplete {
                 String doi = result.getString("doi");
                 newEntry.addField(BibTeXEntry.KEY_DOI, new StringValue(doi, StringValue.Style.BRACED));
             } else {
-                System.out.println("Warning: No doi found");
+                System.out.println("Warning: No doi found. Formatting without doi.");
             }
         }
         return newEntry;

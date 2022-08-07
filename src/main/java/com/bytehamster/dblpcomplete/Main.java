@@ -6,7 +6,7 @@ public class Main {
             printUsage();
             return;
         }
-        Format format = Format.CONDENSED;
+        Format format = Format.CONDENSED_WITH_DOI;
         for (int i = 0; i < args.length - 1; i++) {
             switch (args[i]) {
                 case "--condensed":
