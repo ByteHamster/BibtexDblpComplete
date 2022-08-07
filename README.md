@@ -1,15 +1,20 @@
 # BibtexDblpComplete
 
 This tool takes a bibtex file and tries to complete each entry using the dblp database.
-Uses dblp's "condensed" format, but adds the doi.
+Supports all formats offered by dblp, and an additional format that is based on "condensed" but includes the doi.
+If there are multiple search results on dblp, it takes the first one with matching year.
 
-Usage:
+### Usage
+
+Download the jar file attached to the latest release (or build using `mvn package`) and run:
 
 ```
-java -jar BibtexDblpComplete.jar paper.bib
+java -jar BibtexDblpComplete.jar [FORMAT] FILENAME
 ```
 
-Example interaction:
+`FORMAT` can be one of `--condensed`, `--condensed-with-doi`, `--standard`, `--crossref`
+
+### Example interaction
 
 ```
 BibTeXObject 0 of 65

@@ -36,7 +36,7 @@ public class Main {
     }
 
     private static void printUsage() {
-        System.err.println("Usage: java -jar BibtexDblpComplete [FORMAT] FILENAME");
+        System.err.println("Usage: java -jar BibtexDblpComplete.jar [FORMAT] FILENAME");
         System.err.println("FORMAT can be one of --condensed, --condensed-with-doi, --standard, --crossref");
     }
 }
