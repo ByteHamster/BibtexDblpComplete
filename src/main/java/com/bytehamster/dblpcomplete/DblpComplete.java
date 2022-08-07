@@ -55,17 +55,22 @@ public class DblpComplete {
                 newDatabase.addObject(object);
                 continue;
             }
-            System.out.println("\n\n");
+            System.out.println("\n");
             System.out.println("BibTeXObject " + i + " of " + objects.size());
             BibTeXEntry entry = (BibTeXEntry) object;
             String title = get(entry, BibTeXEntry.KEY_TITLE);
             try {
                 System.out.println("Loading from dblp: " + title);
                 BibTeXEntry betterEntry = tryImprove(entry);
+                if (betterEntry == null) {
+                    notFound.add(title);
+                    newDatabase.addObject(entry);
+                    continue;
+                }
                 if (format(entry).equals(format(betterEntry))) {
                     System.out.println("Is already optimized.");
-                    newDatabase.addObject(betterEntry);
                     alreadyGood.add(title);
+                    newDatabase.addObject(betterEntry);
                     continue;
                 }
                 preview(entry, betterEntry);
@@ -148,7 +153,7 @@ public class DblpComplete {
                 .getJSONObject("hits");
         if (!hitParent.has("hit")) {
             System.err.println("No hits");
-            return entry;
+            return null;
         }
         JSONArray hits = hitParent.getJSONArray("hit");
         JSONObject result = hits.getJSONObject(0).getJSONObject("info"); // Default
