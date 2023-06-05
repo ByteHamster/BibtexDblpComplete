@@ -64,7 +64,7 @@ public class Columns {
 
     private String pad(String word, int newLength){
         if (word.length() > newLength) {
-            return word.substring(0, newLength-1) + "…";
+            return word.substring(0, newLength-3) + "...";
         }
         return word + new String(new char[newLength - word.length()]).replace("\0", " ");
     }

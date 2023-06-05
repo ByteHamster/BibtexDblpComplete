@@ -212,7 +212,7 @@ public class DblpComplete {
     private void preview(BibTeXEntry entry1, BibTeXEntry entry2) throws IOException {
         Columns columns = new Columns(2);
         columns.columnSeparator = " | ";
-        columns.maxColumnSize = 60;
+        columns.maxColumnSize = 100;
         columns.addLine("Original entry", "Suggested change");
         columns.addLine("-----", "-----");
         columns.writeColumn(format(entry1), 2, 0);
