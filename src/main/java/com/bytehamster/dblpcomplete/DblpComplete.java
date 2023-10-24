@@ -61,6 +61,7 @@ public class DblpComplete {
             String title = get(entry, BibTeXEntry.KEY_TITLE);
             try {
                 System.out.println("Loading from dblp: " + title);
+                Thread.sleep(3000);
                 BibTeXEntry betterEntry = tryImprove(entry);
                 if (betterEntry == null) {
                     notFound.add(title);
@@ -89,7 +90,7 @@ public class DblpComplete {
                     newDatabase.addObject(entry);
                     skippedManually.add(title);
                 }
-            } catch (JSONException | IOException | ParseException e) {
+            } catch (JSONException | InterruptedException | IOException | ParseException e) {
                 e.printStackTrace();
                 newDatabase.addObject(object);
                 notFound.add(title);
