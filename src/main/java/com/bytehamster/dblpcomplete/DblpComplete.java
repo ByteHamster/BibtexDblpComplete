@@ -94,6 +94,13 @@ public class DblpComplete {
                 e.printStackTrace();
                 newDatabase.addObject(object);
                 notFound.add(title);
+                if (e.getMessage().contains("429")) {
+                    System.out.print("Try next one? [Y]es, [w]rite&close ");
+                    String read = Utils.read();
+                    if (read.equals("w")) {
+                        break;
+                    }
+                }
             }
         }
         // Re-add remaining objects in case of a break
