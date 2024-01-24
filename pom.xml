@@ -6,7 +6,7 @@
 
     <groupId>com.bytehamster</groupId>
     <artifactId>BibtexDblpComplete</artifactId>
-    <version>1.2</version>
+    <version>1.3</version>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
