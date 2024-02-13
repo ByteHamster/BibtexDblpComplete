@@ -165,12 +165,14 @@ public class DblpComplete {
         }
         JSONArray hits = hitParent.getJSONArray("hit");
         JSONObject result = hits.getJSONObject(0).getJSONObject("info"); // Default
-        for (int i = 0; i < hits.length(); i++) {
-            // If there is multiple search results, use the first that has the same year
-            if (get(entry, BibTeXEntry.KEY_YEAR).equals(
-                    hits.getJSONObject(i).getJSONObject("info").getString("year"))) {
-                result = hits.getJSONObject(i).getJSONObject("info");
-                break;
+        // If there is multiple search results, use the first that has the same year
+        if (get(entry, BibTeXEntry.KEY_YEAR) != null) {
+            for (int i = 0; i < hits.length(); i++) {
+                if (get(entry, BibTeXEntry.KEY_YEAR).equals(
+                        hits.getJSONObject(i).getJSONObject("info").getString("year"))) {
+                    result = hits.getJSONObject(i).getJSONObject("info");
+                    break;
+                }
             }
         }
         String key = result.getString("key");
